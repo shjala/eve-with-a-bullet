@@ -164,6 +164,10 @@ ssh_cmd() {
         root@localhost "$@"
 }
 
+scp_to_eve() {
+    ssh_cmd "cat > $2" < "$1"
+}
+
 require_tool() {
     command -v "$1" &>/dev/null || { log_error "Required tool not found: $1"; exit 1; }
 }
@@ -228,7 +232,6 @@ log_step "=== Step 1: Prerequisites ==="
 
 require_tool git
 require_tool ssh
-require_tool scp
 require_tool ssh-keygen
 require_tool jq
 require_tool make
@@ -373,11 +376,8 @@ log_info "Building test binary (static linux/amd64)..."
 log_info "Test binary built: $TESTS_BIN_LOCAL"
 
 log_info "Uploading test binary to EVE..."
-scp -i "$SSH_KEY" -P "$SSH_PORT" \
-    -o StrictHostKeyChecking=no \
-    -o UserKnownHostsFile=/dev/null \
-    -o LogLevel=ERROR \
-    "$TESTS_BIN_LOCAL" "root@localhost:$TESTS_BIN_REMOTE"
+scp_to_eve "$TESTS_BIN_LOCAL" "$TESTS_BIN_REMOTE"
+ssh_cmd "chmod +x $TESTS_BIN_REMOTE"
 log_info "Uploaded to $TESTS_BIN_REMOTE"
 
 log_info ""
@@ -413,11 +413,8 @@ build_and_upload_tests() {
     log_info "Test binary built: $TESTS_BIN_LOCAL"
 
     log_info "Uploading test binary to EVE..."
-    scp -i "$SSH_KEY" -P "$SSH_PORT" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        "$TESTS_BIN_LOCAL" "root@localhost:$TESTS_BIN_REMOTE"
+    scp_to_eve "$TESTS_BIN_LOCAL" "$TESTS_BIN_REMOTE"
+    ssh_cmd "chmod +x $TESTS_BIN_REMOTE"
     log_info "Uploaded to $TESTS_BIN_REMOTE"
 
     RAW_LIST=$(ssh_cmd "$TESTS_BIN_REMOTE --list" 2>/dev/null)
