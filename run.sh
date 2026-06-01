@@ -8,6 +8,7 @@
 #
 # Usage: ./run_eve.sh [--repo-root <path>] [--pr <number>] [--test <name>]
 #                     [--skip-onboard] [--skip-build] [--clean] [--standalone]
+#                     [--no-sha256]
 #
 #   --repo-root    Path to the EVE repository root (overrides .env file)
 #   --pr           GitHub PR number from lf-edge/eve to checkout and test
@@ -16,6 +17,8 @@
 #   --skip-build   Skip the make live step
 #   --clean        Remove the working directory and start fresh
 #   --standalone   Download eve-with-a-bullet from GitHub, run from temp dir, clean up
+#   --no-sha256    Start swtpm with SHA256 PCR bank disabled (passes SHA256_BANK=N to
+#                  make run); vtpmd falls back to NV-stored key via FetchVaultKey
 #
 # Standalone (pipe-to-bash) example:
 #   curl -sL https://raw.githubusercontent.com/shjala/eve-with-a-bullet/main/run.sh \
@@ -75,6 +78,7 @@ fi
 SKIP_ONBOARD=false
 SKIP_BUILD=false
 CLEAN=false
+NO_SHA256=false
 PR_NUMBER=""
 RUN_TEST=""
 while [[ $# -gt 0 ]]; do
@@ -94,6 +98,7 @@ while [[ $# -gt 0 ]]; do
         --skip-onboard) SKIP_ONBOARD=true; shift ;;
         --skip-build)   SKIP_BUILD=true; shift ;;
         --clean)        CLEAN=true; shift ;;
+        --no-sha256)    NO_SHA256=true; shift ;;
         *) echo "[ERROR] Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -318,7 +323,12 @@ log_step "=== Step 5: Boot EVE ==="
 
 log_info "EVE run log -> $EVE_RUN_LOG"
 pushd "$REPO_ROOT" > /dev/null
-make run TPM=Y QEMU_EVE_SERIAL="$EVE_SERIAL" > "$EVE_RUN_LOG" 2>&1 &
+if $NO_SHA256; then
+    log_info "Starting EVE with SHA256 PCR bank disabled (SHA256_BANK=N)"
+    make run TPM=Y SHA256_BANK=N QEMU_EVE_SERIAL="$EVE_SERIAL" > "$EVE_RUN_LOG" 2>&1 &
+else
+    make run TPM=Y QEMU_EVE_SERIAL="$EVE_SERIAL" > "$EVE_RUN_LOG" 2>&1 &
+fi
 QEMU_PID=$!
 popd > /dev/null
 log_info "QEMU started (PID $QEMU_PID)"
